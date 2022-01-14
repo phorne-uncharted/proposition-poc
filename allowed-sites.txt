@@ -1,0 +1,1 @@
+onedemo-telco.azurewebsites.net
