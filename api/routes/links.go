@@ -11,8 +11,10 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/queue"
 	uuid "github.com/gofrs/uuid"
 	"github.com/pkg/errors"
+	log "github.com/unchartedsoftware/plog"
 )
 
 // TreemapItem is a transformed graph to match the expected treemap structure.
@@ -48,11 +50,11 @@ type Proposition struct {
 	ParentURL     string   `json:"parentUrl"`
 }
 
-func buildTreemap(graph *Graph) *TreemapItem {
-	return nodeToItem(1, graph.Root)
+func buildTreemap(graph *Graph, maxDepth int) *TreemapItem {
+	return nodeToItem(maxDepth, 1, graph.Root)
 }
 
-func nodeToItem(depth int, node *Node) *TreemapItem {
+func nodeToItem(maxDepth int, depth int, node *Node) *TreemapItem {
 	colName := ""
 	if depth > 1 {
 		colName = fmt.Sprintf("level%d", depth)
@@ -63,12 +65,14 @@ func nodeToItem(depth int, node *Node) *TreemapItem {
 		Children: make([]*TreemapItem, len(node.Neighbours)),
 	}
 
-	for i, c := range node.Neighbours {
-		item.Children[i] = nodeToItem(depth+1, c)
+	if depth < maxDepth {
+		for i, c := range node.Neighbours {
+			item.Children[i] = nodeToItem(maxDepth, depth+1, c)
+		}
 	}
 
 	if len(item.Children) == 0 {
-		item.Value = 20
+		item.Value = 1
 	}
 
 	return item
@@ -100,6 +104,9 @@ func LinksHandler(allowedSites []string) func(http.ResponseWriter, *http.Request
 		}
 
 		urlRaw := params["url"].(string)
+		maxDepth := int(params["maxDepth"].(float64))
+		log.Infof("starting processing of site '%s' to a max depth of %d", urlRaw, maxDepth)
+
 		urlParsed, err := url.Parse(urlRaw)
 		if err != nil {
 			handleError(w, errors.Wrap(err, "Unable to parse url"))
@@ -111,8 +118,8 @@ func LinksHandler(allowedSites []string) func(http.ResponseWriter, *http.Request
 			return
 		}
 
-		graph := buildGraph(urlParsed)
-		treemap := buildTreemap(graph)
+		graph := processGraph(urlParsed.String(), buildNodes(urlParsed))
+		treemap := buildTreemap(graph, maxDepth)
 
 		// marshal data
 		err = handleJSON(w, treemap)
@@ -123,11 +130,14 @@ func LinksHandler(allowedSites []string) func(http.ResponseWriter, *http.Request
 	}
 }
 
-func buildGraph(urlParsed *url.URL) *Graph {
+func buildNodes(urlParsed *url.URL) map[string]*Node {
+	log.Infof("building graph")
 	nodes := map[string]*Node{}
 	c := colly.NewCollector(
-		colly.AllowedDomains("onedemo-telco.azurewebsites.net"),
+		colly.AllowedDomains(urlParsed.Hostname()),
 	)
+
+	q, _ := queue.New(1, &queue.InMemoryQueueStorage{MaxSize: 10000})
 
 	// Find and visit all links
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -140,30 +150,31 @@ func buildGraph(urlParsed *url.URL) *Graph {
 		nodes = addNode(nodes, prop)
 	})
 
-	c.Visit(urlParsed.String())
+	q.AddURL(urlParsed.String())
+	q.Run(c)
 
-	return processGraph(urlParsed.String(), nodes)
+	return nodes
 }
 
 func processGraph(url string, nodes map[string]*Node) *Graph {
 	root := nodes[""]
-	root = buildBreadCrumb(nil, root, []*Node{})[0]
+	root = buildBreadCrumb(nil, root, "/", []*Node{})[0]
 	return &Graph{
 		URL:  url,
 		Root: root,
 	}
 }
 
-func buildBreadCrumb(parent *Node, current *Node, alreadyProcessed []*Node) []*Node {
+func buildBreadCrumb(parent *Node, current *Node, separator string, alreadyProcessed []*Node) []*Node {
 	if parent == nil {
-		current.Data.FullName = fmt.Sprintf("/")
+		current.Data.FullName = fmt.Sprintf("%s", separator)
 	} else {
-		current.Data.FullName = fmt.Sprintf("%s%s/", parent.Data.FullName, current.Data.Tag)
+		current.Data.FullName = fmt.Sprintf("%s%s%s", parent.Data.FullName, current.Data.Tag, separator)
 		alreadyProcessed = append(alreadyProcessed, current)
 	}
 
 	for _, c := range current.Neighbours {
-		alreadyProcessed = buildBreadCrumb(current, c, alreadyProcessed)
+		alreadyProcessed = buildBreadCrumb(current, c, separator, alreadyProcessed)
 	}
 
 	return alreadyProcessed
@@ -214,7 +225,6 @@ func outputData(outputName string, propositions []*Proposition) error {
 func processLink(r *colly.Response) (*Proposition, error) {
 	parent := r.Ctx.Get("parent")
 	labels, _ := getLabels(r)
-	fmt.Printf("Visiting %v\tParent %v\n", r.Request.URL, parent)
 	id, _ := createID()
 	return &Proposition{
 		ID:            id,

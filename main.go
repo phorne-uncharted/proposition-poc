@@ -77,7 +77,8 @@ func main() {
 	mux := goji.NewMux()
 	mux.Use(middleware.Log)
 	mux.Use(middleware.Gzip)
-	registerRoutePost(mux, "/site/links", routes.LinksHandler(allowedSites))
+	registerRoutePost(mux, "/site/treemap", routes.LinksHandler(allowedSites))
+	registerRoutePost(mux, "/site/treegraph", routes.TreeGraphHandler(allowedSites))
 
 	registerRoute(mux, "/*", routes.FileHandler("./dist"))
 

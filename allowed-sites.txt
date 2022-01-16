@@ -1,1 +1,2 @@
 onedemo-telco.azurewebsites.net
+onedemo-energy.azurewebsites.net

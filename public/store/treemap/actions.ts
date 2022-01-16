@@ -11,16 +11,32 @@ export type TreemapContext = ActionContext<TreemapState, PropositionState>;
 export const actions = {
   async fetchTreemap(
     context: TreemapContext,
-    args: { url: string }
+    args: { url: string; maxDepth: number }
   ): Promise<void> {
     try {
-      const response = await axios.post(`/site/links`, {
+      const response = await axios.post(`/site/treemap`, {
         url: args.url,
+        maxDepth: args.maxDepth,
       });
       mutations.setTreemap(context, response.data);
     } catch (error) {
       console.error(error);
       mutations.setTreemap(context, null);
+    }
+  },
+  async fetchTreegraph(
+    context: TreemapContext,
+    args: { url: string; maxDepth: number }
+  ): Promise<void> {
+    try {
+      const response = await axios.post(`/site/treegraph`, {
+        url: args.url,
+        maxDepth: args.maxDepth,
+      });
+      mutations.setTreegraph(context, response.data);
+    } catch (error) {
+      console.error(error);
+      mutations.setTreegraph(context, null);
     }
   },
 };

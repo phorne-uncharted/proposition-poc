@@ -1,5 +1,83 @@
 import * as d3 from "d3";
-import { Treemap } from "../store/treemap/index";
+import { Treemap, TreeGraph } from "../store/treemap/index";
+
+export function graphTreegraph(rootTag: string, treegraphData: TreeGraph) {
+  var margin = { top: 20, right: 40, bottom: 20, left: 40 };
+
+  const widthRaw = d3.select(rootTag).style("width");
+  const width =
+    Number(widthRaw.substring(0, widthRaw.length - 2)) -
+    margin.left -
+    margin.right;
+
+  const heightRaw = d3.select(rootTag).style("height");
+  const height =
+    Number(heightRaw.substring(0, heightRaw.length - 2)) -
+    margin.top -
+    margin.bottom;
+
+  // append the svg object to the body of the page
+  d3.select(rootTag).selectAll("*").remove();
+  var svg = d3.select(rootTag),
+    g = svg
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  var tree = d3.tree().size([height, width - 160]);
+
+  var stratify = d3.stratify().parentId(function (d: any) {
+    return d.id.substring(0, d.id.lastIndexOf("."));
+  });
+
+  var root = stratify(treegraphData.items).sort(function (a: any, b: any) {
+    return a.height - b.height || a.id.localeCompare(b.id);
+  });
+
+  var link = g
+    .selectAll(".link")
+    .data(tree(root).links())
+    .enter()
+    .append("path")
+    .attr("class", "link")
+    .attr(
+      "d",
+      d3
+        .linkHorizontal()
+        .x(function (d: any) {
+          return d.y;
+        })
+        .y(function (d: any) {
+          return d.x;
+        }) as any
+    );
+
+  var node = g
+    .selectAll(".node")
+    .data(root.descendants())
+    .enter()
+    .append("g")
+    .attr("class", function (d) {
+      return "node" + (d.children ? " node--internal" : " node--leaf");
+    })
+    .attr("transform", function (d: any) {
+      return "translate(" + d.y + "," + d.x + ")";
+    });
+
+  node.append("circle").attr("r", 2.5);
+
+  node
+    .append("text")
+    .attr("dy", 3)
+    .attr("x", function (d) {
+      return d.children ? -8 : 8;
+    })
+    .style("text-anchor", function (d) {
+      return d.children ? "end" : "start";
+    })
+    .text(function (d) {
+      return d.id.substring(d.id.lastIndexOf(".") + 1);
+    });
+}
 
 export function graphTreemap(rootTag: string, treemapData: Treemap) {
   var margin = { top: 10, right: 10, bottom: 10, left: 10 };
@@ -17,9 +95,9 @@ export function graphTreemap(rootTag: string, treemapData: Treemap) {
     margin.bottom;
 
   // append the svg object to the body of the page
+  d3.select(rootTag).selectAll("*").remove();
   var svg = d3
     .select(rootTag)
-    .append("svg")
     .append("g")
     .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 

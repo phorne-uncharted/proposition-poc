@@ -21,14 +21,17 @@ const { commit, read, dispatch } = getStoreAccessors<
 // Typed getters
 export const getters = {
   getTreemap: read(moduleGetters.getTreemap),
+  getTreegraph: read(moduleGetters.getTreegraph),
 };
 
 // Typed actions
 export const actions = {
   fetchTreemap: dispatch(moduleActions.fetchTreemap),
+  fetchTreegraph: dispatch(moduleActions.fetchTreegraph),
 };
 
 // Typed mutations
 export const mutations = {
   setTreemap: commit(moduleMutations.setTreemap),
+  setTreegraph: commit(moduleMutations.setTreegraph),
 };

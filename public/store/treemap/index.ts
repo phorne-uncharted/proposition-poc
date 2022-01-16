@@ -1,3 +1,12 @@
+export interface TreeGraphItem {
+  id: string;
+  value: string;
+}
+
+export interface TreeGraph {
+  items: TreeGraphItem[];
+}
+
 export interface Treemap {
   name: string;
   colName: string;
@@ -7,11 +16,13 @@ export interface Treemap {
 
 export interface TreemapState {
   treemap: Treemap;
+  treegraph: TreeGraph;
 }
 
 export const defaultState = (): TreemapState => {
   return {
     treemap: null,
+    treegraph: null,
   };
 };
 
