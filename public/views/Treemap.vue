@@ -72,8 +72,10 @@ export default Vue.extend({
       switch (this.selectedGraphType) {
         case "treemap":
           await this.loadTreemap();
+          break;
         case "treegraph":
           await this.loadTreegraph();
+          break;
       }
       this.isCrawling = false;
     },
